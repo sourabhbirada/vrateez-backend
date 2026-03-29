@@ -4,9 +4,10 @@ const Product = require("../model/Product");
 const asyncHandler = require("../utilits/asyncHandler");
 const ApiError = require("../utilits/ApiError");
 const { ok } = require("../utilits/response");
+const { validateCouponForSubtotal } = require("../services/couponService");
 
 const createOrder = asyncHandler(async (req, res) => {
-  const { shippingAddress, paymentMethod, notes } = req.body;
+  const { shippingAddress, paymentMethod, notes, couponCode } = req.body;
 
   const cart = await Cart.findOne({ user: req.user._id }).populate("items.product");
 
@@ -36,7 +37,19 @@ const createOrder = asyncHandler(async (req, res) => {
   }
 
   const shippingCharge = subtotal >= 499 ? 0 : 49;
-  const totalAmount = subtotal + shippingCharge;
+  let discountAmount = 0;
+  let appliedCouponCode;
+
+  if (couponCode) {
+    const couponResult = validateCouponForSubtotal(subtotal, couponCode);
+    if (!couponResult.valid) {
+      throw new ApiError(400, couponResult.message);
+    }
+    discountAmount = couponResult.discountAmount;
+    appliedCouponCode = couponResult.code;
+  }
+
+  const totalAmount = Math.max(subtotal - discountAmount + shippingCharge, 0);
 
   const order = await Order.create({
     user: req.user._id,
@@ -44,9 +57,10 @@ const createOrder = asyncHandler(async (req, res) => {
     shippingAddress,
     paymentMethod,
     notes,
+    couponCode: appliedCouponCode,
     subtotal,
     shippingCharge,
-    discountAmount: 0,
+    discountAmount,
     totalAmount,
   });
 

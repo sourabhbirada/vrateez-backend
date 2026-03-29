@@ -2,6 +2,7 @@ const Product = require("../model/Product");
 const asyncHandler = require("../utilits/asyncHandler");
 const { ok } = require("../utilits/response");
 const ApiError = require("../utilits/ApiError");
+const { seedProducts } = require("../services/productSeedData");
 
 const getProducts = asyncHandler(async (req, res) => {
   const { category, q, page = 1, limit = 20 } = req.query;
@@ -28,6 +29,31 @@ const getProducts = asyncHandler(async (req, res) => {
       .limit(Number(limit)),
     Product.countDocuments(filter),
   ]);
+
+  // Self-heal empty catalog in fresh environments.
+  if (total === 0) {
+    await Product.insertMany(seedProducts, { ordered: false }).catch(() => {
+      // Ignore duplicate errors from concurrent requests.
+    });
+
+    const [seededItems, seededTotal] = await Promise.all([
+      Product.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      Product.countDocuments(filter),
+    ]);
+
+    return ok(res, {
+      items: seededItems,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total: seededTotal,
+        totalPages: Math.ceil(seededTotal / Number(limit)),
+      },
+    });
+  }
 
   return ok(res, {
     items,

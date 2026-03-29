@@ -16,6 +16,7 @@ const {
   isStripeConfigured,
   getAvailableProviders,
 } = require("../services/paymentService");
+const { validateCouponForSubtotal } = require("../services/couponService");
 
 // Helper to validate MongoDB ObjectId
 const isValidObjectId = (id) => {
@@ -24,7 +25,7 @@ const isValidObjectId = (id) => {
 
 // Create guest order
 const createGuestOrder = asyncHandler(async (req, res) => {
-  const { items, shippingAddress, paymentMethod, guestInfo, notes } = req.body;
+  const { items, shippingAddress, paymentMethod, guestInfo, notes, couponCode } = req.body;
 
   if (!items || items.length === 0) {
     throw new ApiError(400, "Cart is empty");
@@ -61,7 +62,19 @@ const createGuestOrder = asyncHandler(async (req, res) => {
   }
 
   const shippingCharge = subtotal >= 499 ? 0 : 49;
-  const totalAmount = subtotal + shippingCharge;
+  let discountAmount = 0;
+  let appliedCouponCode;
+
+  if (couponCode) {
+    const couponResult = validateCouponForSubtotal(subtotal, couponCode);
+    if (!couponResult.valid) {
+      throw new ApiError(400, couponResult.message);
+    }
+    discountAmount = couponResult.discountAmount;
+    appliedCouponCode = couponResult.code;
+  }
+
+  const totalAmount = Math.max(subtotal - discountAmount + shippingCharge, 0);
 
   const order = await Order.create({
     guestInfo,
@@ -69,9 +82,10 @@ const createGuestOrder = asyncHandler(async (req, res) => {
     shippingAddress,
     paymentMethod,
     notes,
+    couponCode: appliedCouponCode,
     subtotal,
     shippingCharge,
-    discountAmount: 0,
+    discountAmount,
     totalAmount,
   });
 
