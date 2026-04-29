@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "seed": "node services/seedProducts.js"
+    "seed": "node services/resetProducts.js"
   },
   "author": "",
   "license": "ISC",
