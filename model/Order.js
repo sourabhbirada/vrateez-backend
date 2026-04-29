@@ -11,6 +11,21 @@ const orderItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const trackingEventSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ["placed", "processing", "shipped", "delivered", "cancelled"],
+      required: true,
+    },
+    title: { type: String, required: true },
+    note: { type: String },
+    location: { type: String },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const orderSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -49,6 +64,13 @@ const orderSchema = new mongoose.Schema(
     shippingCharge: { type: Number, default: 0 },
     totalAmount: { type: Number, required: true },
     notes: String,
+    trackingNumber: { type: String, trim: true },
+    courierPartner: { type: String, trim: true },
+    estimatedDeliveryAt: { type: Date },
+    trackingEvents: {
+      type: [trackingEventSchema],
+      default: [],
+    },
   },
   { timestamps: true }
 );

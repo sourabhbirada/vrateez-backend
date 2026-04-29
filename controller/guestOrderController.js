@@ -7,13 +7,9 @@ const ApiError = require("../utilits/ApiError");
 const { ok } = require("../utilits/response");
 const {
   createRazorpayOrder,
-  createStripePaymentIntent,
   verifyRazorpaySignature,
-  verifyStripePayment,
   getRazorpayKeyId,
-  getStripePublishableKey,
   isRazorpayConfigured,
-  isStripeConfigured,
   getAvailableProviders,
 } = require("../services/paymentService");
 const { validateCouponForSubtotal } = require("../services/couponService");
@@ -92,9 +88,9 @@ const createGuestOrder = asyncHandler(async (req, res) => {
   return ok(res, { order }, "Guest order created", 201);
 });
 
-// Create payment for guest order (supports Stripe and Razorpay)
+// Create payment for guest order (supports Razorpay)
 const createGuestPayment = asyncHandler(async (req, res) => {
-  const { orderId, email, provider = "stripe" } = req.body;
+  const { orderId, email, provider = "razorpay" } = req.body;
 
   const order = await Order.findById(orderId);
 
@@ -107,12 +103,15 @@ const createGuestPayment = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Email does not match order");
   }
 
-  let paymentData;
-  if (provider === "razorpay") {
-    paymentData = await createRazorpayOrder(order);
-  } else {
-    paymentData = await createStripePaymentIntent(order);
+  if (provider !== "razorpay") {
+    throw new ApiError(400, "Unsupported payment provider");
   }
+
+  if (!isRazorpayConfigured()) {
+    throw new ApiError(503, "Razorpay is not configured. Please use Cash on Delivery.");
+  }
+
+  const paymentData = await createRazorpayOrder(order);
 
   const payment = await Payment.create({
     order: order._id,
@@ -132,9 +131,6 @@ const createGuestPayment = asyncHandler(async (req, res) => {
     res,
     {
       payment,
-      // Stripe fields
-      clientSecret: paymentData.clientSecret,
-      stripePublishableKey: getStripePublishableKey(),
       // Razorpay fields
       razorpayOrderId: paymentData.razorpayOrderId,
       razorpayKeyId: getRazorpayKeyId(),
@@ -149,9 +145,9 @@ const createGuestPayment = asyncHandler(async (req, res) => {
   );
 });
 
-// Verify guest payment (supports Stripe and Razorpay)
+// Verify guest payment (supports Razorpay)
 const verifyGuestPayment = asyncHandler(async (req, res) => {
-  const { orderId, email, provider = "stripe", razorpayOrderId, razorpayPaymentId, razorpaySignature, paymentIntentId } = req.body;
+  const { orderId, email, provider = "razorpay", razorpayOrderId, razorpayPaymentId, razorpaySignature, paymentIntentId } = req.body;
 
   const order = await Order.findById(orderId);
 
@@ -178,10 +174,7 @@ const verifyGuestPayment = asyncHandler(async (req, res) => {
     isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
     transactionId = razorpayPaymentId;
   } else {
-    // Verify Stripe payment
-    const stripeResult = await verifyStripePayment(paymentIntentId || payment.paymentId);
-    isValid = stripeResult.verified;
-    transactionId = paymentIntentId || payment.paymentId;
+    throw new ApiError(400, "Unsupported payment provider");
   }
 
   if (!isValid) {

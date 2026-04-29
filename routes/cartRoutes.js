@@ -11,7 +11,7 @@ const { requireFields } = require("../middleware/validateMiddleware");
 
 const router = express.Router();
 
-router.use(protect);
+router.use(protect); 
 
 router.get("/", getCart);
 router.post("/items", requireFields(["productId"]), addToCart);

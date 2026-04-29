@@ -1,5 +1,21 @@
 const crypto = require("crypto");
 
+function getReadableRazorpayError(error) {
+  if (!error) {
+    return "Unable to create Razorpay order";
+  }
+
+  // Razorpay SDK often nests API errors under `error.error.description`.
+  const message =
+    error?.error?.description ||
+    error?.error?.message ||
+    error?.description ||
+    error?.message ||
+    "Unable to create Razorpay order";
+
+  return String(message);
+}
+
 // Check if Stripe is configured
 const isStripeConfigured = () => {
   return !!process.env.STRIPE_SECRET_KEY;
@@ -32,6 +48,19 @@ const getRazorpay = () => {
   }
   return razorpayInstance;
 };
+
+function isRazorpayAuthError(error) {
+  const statusCode = error?.statusCode || error?.error?.statusCode || error?.response?.status;
+  const message = String(
+    error?.error?.description ||
+      error?.error?.message ||
+      error?.description ||
+      error?.message ||
+      ""
+  ).toLowerCase();
+
+  return statusCode === 401 || statusCode === 403 || message.includes("authentication") || message.includes("unauthoriz");
+}
 
 // Build mock payment data
 function buildMockPayment(order) {
@@ -96,8 +125,9 @@ async function createRazorpayOrder(order) {
   const razorpay = getRazorpay();
 
   if (!razorpay) {
-    // Fallback to mock if Razorpay not configured
-    return buildMockPayment(order);
+    const error = new Error("Razorpay is not configured");
+    error.statusCode = 503;
+    throw error;
   }
 
   const options = {
@@ -109,7 +139,23 @@ async function createRazorpayOrder(order) {
     },
   };
 
-  const razorpayOrder = await razorpay.orders.create(options);
+  let razorpayOrder;
+  try {
+    razorpayOrder = await razorpay.orders.create(options);
+  } catch (error) {
+    if (isRazorpayAuthError(error)) {
+      const wrappedError = new Error("Razorpay authentication failed. Verify RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.");
+      wrappedError.statusCode = 401;
+      wrappedError.cause = error;
+      throw wrappedError;
+    }
+
+    const message = getReadableRazorpayError(error);
+    const wrappedError = new Error(`Razorpay order creation failed: ${message}`);
+    wrappedError.statusCode = 502;
+    wrappedError.cause = error;
+    throw wrappedError;
+  }
 
   return {
     paymentId: `pay_${Date.now()}`,
@@ -157,6 +203,7 @@ function getAvailableProviders() {
 
 module.exports = {
   buildMockPayment,
+  getReadableRazorpayError,
   createStripePaymentIntent,
   verifyStripePayment,
   createRazorpayOrder,

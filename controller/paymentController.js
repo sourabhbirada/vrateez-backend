@@ -5,31 +5,30 @@ const ApiError = require("../utilits/ApiError");
 const { ok } = require("../utilits/response");
 const {
   createRazorpayOrder,
-  createStripePaymentIntent,
   verifyRazorpaySignature,
-  verifyStripePayment,
   getRazorpayKeyId,
-  getStripePublishableKey,
   isRazorpayConfigured,
-  isStripeConfigured,
   getAvailableProviders,
 } = require("../services/paymentService");
 
-// Create payment for authenticated user (supports Stripe and Razorpay)
+// Create payment for authenticated user (supports Razorpay)
 const createPaymentIntent = asyncHandler(async (req, res) => {
-  const { orderId, provider = "stripe" } = req.body;
+  const { orderId, provider = "razorpay" } = req.body;
 
   const order = await Order.findOne({ _id: orderId, user: req.user._id });
   if (!order) {
     throw new ApiError(404, "Order not found");
   }
 
-  let paymentData;
-  if (provider === "razorpay") {
-    paymentData = await createRazorpayOrder(order);
-  } else {
-    paymentData = await createStripePaymentIntent(order);
+  if (provider !== "razorpay") {
+    throw new ApiError(400, "Unsupported payment provider");
   }
+
+  if (!isRazorpayConfigured()) {
+    throw new ApiError(503, "Razorpay is not configured. Please use Cash on Delivery.");
+  }
+
+  const paymentData = await createRazorpayOrder(order);
 
   const payment = await Payment.create({
     order: order._id,
@@ -50,9 +49,6 @@ const createPaymentIntent = asyncHandler(async (req, res) => {
     res,
     {
       payment,
-      // Stripe fields
-      clientSecret: paymentData.clientSecret,
-      stripePublishableKey: getStripePublishableKey(),
       // Razorpay fields
       razorpayOrderId: paymentData.razorpayOrderId,
       razorpayKeyId: getRazorpayKeyId(),
@@ -67,9 +63,9 @@ const createPaymentIntent = asyncHandler(async (req, res) => {
   );
 });
 
-// Verify payment for authenticated user (supports Stripe and Razorpay)
+// Verify payment for authenticated user (supports Razorpay)
 const verifyPayment = asyncHandler(async (req, res) => {
-  const { orderId, provider = "stripe", razorpayOrderId, razorpayPaymentId, razorpaySignature, paymentIntentId } = req.body;
+  const { orderId, provider = "razorpay", razorpayOrderId, razorpayPaymentId, razorpaySignature, paymentIntentId } = req.body;
 
   const order = await Order.findOne({ _id: orderId, user: req.user._id });
   if (!order) {
@@ -89,10 +85,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
     isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
     transactionId = razorpayPaymentId;
   } else {
-    // Verify Stripe payment
-    const stripeResult = await verifyStripePayment(paymentIntentId || payment.paymentId);
-    isValid = stripeResult.verified;
-    transactionId = paymentIntentId || payment.paymentId;
+    throw new ApiError(400, "Unsupported payment provider");
   }
 
   if (!isValid) {
