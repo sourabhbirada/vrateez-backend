@@ -19,6 +19,14 @@ const isValidObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id;
 };
 
+function normalizeIndianMobile(input) {
+  const digits = String(input || "").replace(/\D/g, "");
+  if (digits.length >= 12 && digits.startsWith("91")) return digits.slice(-10);
+  if (digits.length === 11 && digits.startsWith("0")) return digits.slice(-10);
+  if (digits.length >= 10) return digits.slice(-10);
+  return null;
+}
+
 // Create guest order
 const createGuestOrder = asyncHandler(async (req, res) => {
   const { items, shippingAddress, paymentMethod, guestInfo, notes, couponCode } = req.body;
@@ -72,6 +80,8 @@ const createGuestOrder = asyncHandler(async (req, res) => {
 
   const totalAmount = Math.max(subtotal - discountAmount + shippingCharge, 0);
 
+  const contactPhone = normalizeIndianMobile(guestInfo.phone) || undefined;
+
   const order = await Order.create({
     guestInfo,
     items: orderItems,
@@ -83,6 +93,7 @@ const createGuestOrder = asyncHandler(async (req, res) => {
     shippingCharge,
     discountAmount,
     totalAmount,
+    contactPhone,
   });
 
   return ok(res, { order }, "Guest order created", 201);

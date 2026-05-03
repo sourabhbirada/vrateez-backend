@@ -1,13 +1,22 @@
 const Cart = require("../model/Cart");
 const Order = require("../model/Order");
 const Product = require("../model/Product");
+const User = require("../model/User");
 const asyncHandler = require("../utilits/asyncHandler");
 const ApiError = require("../utilits/ApiError");
 const { ok } = require("../utilits/response");
 const { validateCouponForSubtotal } = require("../services/couponService");
 
+function normalizeIndianMobile(input) {
+  const digits = String(input || "").replace(/\D/g, "");
+  if (digits.length >= 12 && digits.startsWith("91")) return digits.slice(-10);
+  if (digits.length === 11 && digits.startsWith("0")) return digits.slice(-10);
+  if (digits.length >= 10) return digits.slice(-10);
+  return null;
+}
+
 const createOrder = asyncHandler(async (req, res) => {
-  const { shippingAddress, paymentMethod, notes, couponCode } = req.body;
+  const { shippingAddress, paymentMethod, notes, couponCode, contactPhone: contactPhoneRaw } = req.body;
 
   const cart = await Cart.findOne({ user: req.user._id }).populate("items.product");
 
@@ -51,6 +60,22 @@ const createOrder = asyncHandler(async (req, res) => {
 
   const totalAmount = Math.max(subtotal - discountAmount + shippingCharge, 0);
 
+  const needsPhone = paymentMethod !== "cod";
+  let contactDigits = normalizeIndianMobile(contactPhoneRaw);
+  if (needsPhone && !contactDigits) {
+    contactDigits = normalizeIndianMobile(req.user.phone);
+  }
+  if (needsPhone && (!contactDigits || contactDigits.length < 10)) {
+    throw new ApiError(400, "Valid 10-digit mobile number is required for online payment");
+  }
+
+  const fromBody = normalizeIndianMobile(contactPhoneRaw);
+  if (fromBody && fromBody.length >= 10) {
+    await User.findByIdAndUpdate(req.user._id, { phone: fromBody });
+  }
+
+  const snapshotPhone = contactDigits || normalizeIndianMobile(req.user.phone) || undefined;
+
   const order = await Order.create({
     user: req.user._id,
     items,
@@ -62,6 +87,7 @@ const createOrder = asyncHandler(async (req, res) => {
     shippingCharge,
     discountAmount,
     totalAmount,
+    contactPhone: snapshotPhone,
   });
 
   cart.items = [];

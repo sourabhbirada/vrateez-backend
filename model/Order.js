@@ -64,6 +64,7 @@ const orderSchema = new mongoose.Schema(
     shippingCharge: { type: Number, default: 0 },
     totalAmount: { type: Number, required: true },
     notes: String,
+    contactPhone: { type: String, trim: true },
     trackingNumber: { type: String, trim: true },
     courierPartner: { type: String, trim: true },
     estimatedDeliveryAt: { type: Date },

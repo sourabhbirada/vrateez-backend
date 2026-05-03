@@ -1,5 +1,31 @@
 const crypto = require("crypto");
 
+function getEnvValue(name) {
+  const raw = process.env[name];
+  if (typeof raw !== "string") {
+    return null;
+  }
+
+  // Handles accidental spaces/quotes/invisible characters while copying keys.
+  const normalized = raw
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/\s+/g, "");
+  return normalized || null;
+}
+
+function getRazorpayAuthHint() {
+  const keyId = getEnvValue("RAZORPAY_KEY_ID") || "";
+  if (keyId.startsWith("rzp_live_")) {
+    return "Using LIVE key. Ensure LIVE key secret from Razorpay Dashboard is paired with this key ID.";
+  }
+  if (keyId.startsWith("rzp_test_")) {
+    return "Using TEST key. Ensure TEST key secret from Razorpay Dashboard is paired with this key ID.";
+  }
+  return "Key ID format looks unusual. It should start with rzp_live_ or rzp_test_.";
+}
+
 function getReadableRazorpayError(error) {
   if (!error) {
     return "Unable to create Razorpay order";
@@ -18,12 +44,12 @@ function getReadableRazorpayError(error) {
 
 // Check if Stripe is configured
 const isStripeConfigured = () => {
-  return !!process.env.STRIPE_SECRET_KEY;
+  return !!getEnvValue("STRIPE_SECRET_KEY");
 };
 
 // Check if Razorpay is configured
 const isRazorpayConfigured = () => {
-  return !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+  return !!(getEnvValue("RAZORPAY_KEY_ID") && getEnvValue("RAZORPAY_KEY_SECRET"));
 };
 
 // Get Stripe instance (lazy initialization)
@@ -42,8 +68,8 @@ const getRazorpay = () => {
   if (!razorpayInstance && isRazorpayConfigured()) {
     const Razorpay = require("razorpay");
     razorpayInstance = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
+      key_id: getEnvValue("RAZORPAY_KEY_ID"),
+      key_secret: getEnvValue("RAZORPAY_KEY_SECRET"),
     });
   }
   return razorpayInstance;
@@ -144,7 +170,10 @@ async function createRazorpayOrder(order) {
     razorpayOrder = await razorpay.orders.create(options);
   } catch (error) {
     if (isRazorpayAuthError(error)) {
-      const wrappedError = new Error("Razorpay authentication failed. Verify RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.");
+      const readableReason = getReadableRazorpayError(error);
+      const wrappedError = new Error(
+        `Razorpay authentication failed: ${readableReason}. ${getRazorpayAuthHint()}`
+      );
       wrappedError.statusCode = 401;
       wrappedError.cause = error;
       throw wrappedError;
@@ -175,7 +204,7 @@ function verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySig
   }
 
   const generatedSignature = crypto
-    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+    .createHmac("sha256", getEnvValue("RAZORPAY_KEY_SECRET"))
     .update(`${razorpayOrderId}|${razorpayPaymentId}`)
     .digest("hex");
 
@@ -184,12 +213,12 @@ function verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySig
 
 // Get Razorpay key ID for frontend
 function getRazorpayKeyId() {
-  return process.env.RAZORPAY_KEY_ID || null;
+  return getEnvValue("RAZORPAY_KEY_ID");
 }
 
 // Get Stripe publishable key for frontend
 function getStripePublishableKey() {
-  return process.env.STRIPE_PUBLISHABLE_KEY || null;
+  return getEnvValue("STRIPE_PUBLISHABLE_KEY");
 }
 
 // Get available payment providers

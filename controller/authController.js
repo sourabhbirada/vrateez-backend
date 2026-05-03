@@ -27,6 +27,7 @@ const register = asyncHandler(async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone || undefined,
         role: user.role,
       },
     },
@@ -56,13 +57,24 @@ const login = asyncHandler(async (req, res) => {
       id: user._id,
       name: user.name,
       email: user.email,
+      phone: user.phone || undefined,
       role: user.role,
     },
   });
 });
 
 const me = asyncHandler(async (req, res) => {
-  return ok(res, { user: req.user });
+  const u = req.user;
+  return ok(res, {
+    user: {
+      id: u._id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone || undefined,
+      role: u.role,
+      addresses: u.addresses || [],
+    },
+  });
 });
 
 module.exports = { register, login, me };

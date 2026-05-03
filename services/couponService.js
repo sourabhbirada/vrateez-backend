@@ -1,4 +1,8 @@
-const AVAILABLE_COUPONS = [
+function defaultShippingCharge(subtotal) {
+  return subtotal >= 499 ? 0 : 49;
+}
+
+const BASE_COUPONS = [
   {
     code: "WELCOME10",
     type: "percentage",
@@ -24,6 +28,19 @@ const AVAILABLE_COUPONS = [
   },
 ];
 
+const TEST1INR_COUPON = {
+  code: "TEST1INR",
+  type: "final_total",
+  value: 1,
+  minOrderAmount: 0,
+  description: "Test only: payable total becomes Rs 1 (dev only unless ENABLE_TEST1INR_COUPON=true)",
+};
+
+const test1InrEnabled =
+  process.env.NODE_ENV !== "production" || process.env.ENABLE_TEST1INR_COUPON === "true";
+
+const AVAILABLE_COUPONS = test1InrEnabled ? [...BASE_COUPONS, TEST1INR_COUPON] : BASE_COUPONS;
+
 function normalizeCouponCode(code) {
   return String(code || "")
     .trim()
@@ -36,7 +53,21 @@ function getCouponByCode(code) {
   return AVAILABLE_COUPONS.find((coupon) => coupon.code === normalizedCode) || null;
 }
 
-function calculateDiscountAmount(subtotal, coupon) {
+function calculateDiscountAmount(subtotal, coupon, shippingCharge) {
+  const shipping = shippingCharge ?? defaultShippingCharge(subtotal);
+
+  if (coupon.type === "final_total") {
+    const target = Number(coupon.value);
+    if (!Number.isFinite(target) || target < 0) {
+      return 0;
+    }
+    const gross = subtotal + shipping;
+    if (target >= gross) {
+      return 0;
+    }
+    return gross - target;
+  }
+
   if (coupon.type === "flat") {
     return Math.min(coupon.value, subtotal);
   }
@@ -48,7 +79,12 @@ function calculateDiscountAmount(subtotal, coupon) {
   return rawDiscount;
 }
 
-function validateCouponForSubtotal(subtotal, couponCode) {
+/**
+ * @param {number} subtotal
+ * @param {string} couponCode
+ * @param {number} [shippingCharge] - if omitted, uses same rule as checkout (499+ free else 49)
+ */
+function validateCouponForSubtotal(subtotal, couponCode, shippingCharge) {
   const normalizedCode = normalizeCouponCode(couponCode);
 
   if (!normalizedCode) {
@@ -74,7 +110,12 @@ function validateCouponForSubtotal(subtotal, couponCode) {
     };
   }
 
-  const discountAmount = calculateDiscountAmount(subtotal, coupon);
+  const resolvedShipping =
+    shippingCharge !== undefined && shippingCharge !== null && Number.isFinite(Number(shippingCharge))
+      ? Number(shippingCharge)
+      : defaultShippingCharge(subtotal);
+
+  const discountAmount = calculateDiscountAmount(subtotal, coupon, resolvedShipping);
 
   return {
     valid: true,
@@ -88,4 +129,5 @@ module.exports = {
   normalizeCouponCode,
   getCouponByCode,
   validateCouponForSubtotal,
+  defaultShippingCharge,
 };
