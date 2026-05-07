@@ -1,3 +1,5 @@
+const Coupon = require("../model/Coupon");
+
 function defaultShippingCharge(subtotal) {
   return subtotal >= 499 ? 0 : 49;
 }
@@ -47,10 +49,28 @@ function normalizeCouponCode(code) {
     .toUpperCase();
 }
 
-function getCouponByCode(code) {
+function getCouponByCodeFromDefaults(code) {
   const normalizedCode = normalizeCouponCode(code);
   if (!normalizedCode) return null;
   return AVAILABLE_COUPONS.find((coupon) => coupon.code === normalizedCode) || null;
+}
+
+async function getCouponByCode(code) {
+  const normalizedCode = normalizeCouponCode(code);
+  if (!normalizedCode) return null;
+
+  const now = new Date();
+  const dbCoupon = await Coupon.findOne({
+    code: normalizedCode,
+    isActive: true,
+    $and: [
+      { $or: [{ validFrom: { $exists: false } }, { validFrom: null }, { validFrom: { $lte: now } }] },
+      { $or: [{ validTo: { $exists: false } }, { validTo: null }, { validTo: { $gte: now } }] },
+    ],
+  }).lean();
+
+  if (dbCoupon) return dbCoupon;
+  return getCouponByCodeFromDefaults(normalizedCode);
 }
 
 function calculateDiscountAmount(subtotal, coupon, shippingCharge) {
@@ -84,7 +104,7 @@ function calculateDiscountAmount(subtotal, coupon, shippingCharge) {
  * @param {string} couponCode
  * @param {number} [shippingCharge] - if omitted, uses same rule as checkout (499+ free else 49)
  */
-function validateCouponForSubtotal(subtotal, couponCode, shippingCharge) {
+async function validateCouponForSubtotal(subtotal, couponCode, shippingCharge) {
   const normalizedCode = normalizeCouponCode(couponCode);
 
   if (!normalizedCode) {
@@ -94,7 +114,7 @@ function validateCouponForSubtotal(subtotal, couponCode, shippingCharge) {
     };
   }
 
-  const coupon = getCouponByCode(normalizedCode);
+  const coupon = await getCouponByCode(normalizedCode);
   if (!coupon) {
     return {
       valid: false,

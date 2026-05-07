@@ -50,7 +50,7 @@ const createOrder = asyncHandler(async (req, res) => {
   let appliedCouponCode;
 
   if (couponCode) {
-    const couponResult = validateCouponForSubtotal(subtotal, couponCode);
+    const couponResult = await validateCouponForSubtotal(subtotal, couponCode);
     if (!couponResult.valid) {
       throw new ApiError(400, couponResult.message);
     }

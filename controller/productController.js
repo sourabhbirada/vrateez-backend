@@ -66,6 +66,39 @@ const getProducts = asyncHandler(async (req, res) => {
   });
 });
 
+const getProductsAdmin = asyncHandler(async (req, res) => {
+  const { category, q, page = 1, limit = 50 } = req.query;
+  const filter = {};
+
+  if (category) {
+    filter.category = category;
+  }
+
+  if (q) {
+    filter.$or = [
+      { name: { $regex: q, $options: "i" } },
+      { description: { $regex: q, $options: "i" } },
+      { slug: { $regex: q, $options: "i" } },
+    ];
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+  const [items, total] = await Promise.all([
+    Product.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
+    Product.countDocuments(filter),
+  ]);
+
+  return ok(res, {
+    items,
+    pagination: {
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      totalPages: Math.ceil(total / Number(limit)),
+    },
+  });
+});
+
 const getProductBySlug = asyncHandler(async (req, res) => {
   const product = await Product.findOne({ slug: req.params.slug, isActive: true });
 
@@ -96,6 +129,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 
 module.exports = {
   getProducts,
+  getProductsAdmin,
   getProductBySlug,
   createProduct,
   updateProduct,

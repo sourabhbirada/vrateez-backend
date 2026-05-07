@@ -20,7 +20,7 @@ const validateCoupon = asyncHandler(async (req, res) => {
       ? parsedShipping
       : undefined;
 
-  const result = validateCouponForSubtotal(parsedSubtotal, couponCode, shippingCharge);
+  const result = await validateCouponForSubtotal(parsedSubtotal, couponCode, shippingCharge);
   if (!result.valid) {
     throw new ApiError(400, result.message);
   }

@@ -6,8 +6,8 @@ const productSchema = new mongoose.Schema(
     slug: { type: String, required: true, unique: true, trim: true },
     category: {
       type: String,
-      enum: ["cookies", "infused-cookie", "energy-on-the-go", "savory-snacks", "wholesome-delights"],
       required: true,
+      trim: true,
     },
     image: { type: String, required: true },
     images: [{ type: String }],
