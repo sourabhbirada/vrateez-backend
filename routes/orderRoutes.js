@@ -3,6 +3,7 @@ const {
   createOrder,
   getMyOrders,
   getOrderById,
+  listOrdersAdmin,
   updateOrderStatus,
 } = require("../controller/orderController");
 const { protect, adminOnly } = require("../middleware/authMiddleware");
@@ -18,6 +19,7 @@ router.post(
   createOrder
 );
 router.get("/me", getMyOrders);
+router.get("/admin", adminOnly, listOrdersAdmin);
 router.get("/:id", getOrderById);
 router.patch("/:id/status", adminOnly, updateOrderStatus);
 

@@ -12,6 +12,7 @@ const bannerRoutes = require("./routes/bannerRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const bulkOrderRoutes = require("./routes/bulkOrderRoutes");
 const guestOrderRoutes = require("./routes/guestOrderRoutes");
+const faqRoutes = require("./routes/faqRoutes");
 const { notFound, errorHandler } = require("./utilits/errorMiddleware");
 
 
@@ -31,6 +32,7 @@ app.use("/api/banners", bannerRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/guest", guestOrderRoutes);
 app.use("/api/bulk-order", bulkOrderRoutes);
+app.use("/api/faqs", faqRoutes);
 app.use("/bulk-order", bulkOrderRoutes);
 app.use(notFound);
 app.use(errorHandler);

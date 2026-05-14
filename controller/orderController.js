@@ -132,9 +132,17 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   return ok(res, { order }, "Order updated");
 });
 
+const listOrdersAdmin = asyncHandler(async (_req, res) => {
+  const items = await Order.find()
+    .populate("user", "name email phone")
+    .sort({ createdAt: -1 });
+  return ok(res, { items });
+});
+
 module.exports = {
   createOrder,
   getMyOrders,
   getOrderById,
+  listOrdersAdmin,
   updateOrderStatus,
 };
