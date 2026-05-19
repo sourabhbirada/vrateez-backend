@@ -30,8 +30,9 @@ const getProducts = asyncHandler(async (req, res) => {
     Product.countDocuments(filter),
   ]);
 
-  // Self-heal empty catalog in fresh environments.
-  if (total === 0) {
+  const allowSeed = process.env.ALLOW_PRODUCT_SEED === "true";
+  // Self-heal empty catalog only when explicitly enabled.
+  if (allowSeed && total === 0) {
     await Product.insertMany(seedProducts, { ordered: false }).catch(() => {
       // Ignore duplicate errors from concurrent requests.
     });
@@ -109,6 +110,16 @@ const getProductBySlug = asyncHandler(async (req, res) => {
   return ok(res, { product });
 });
 
+const getProductByIdAdmin = asyncHandler(async (req, res) => {
+  const product = await Product.findById(req.params.id);
+
+  if (!product) {
+    throw new ApiError(404, "Product not found");
+  }
+
+  return ok(res, { product });
+});
+
 const createProduct = asyncHandler(async (req, res) => {
   const created = await Product.create(req.body);
   return ok(res, { product: created }, "Product created", 201);
@@ -130,6 +141,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 module.exports = {
   getProducts,
   getProductsAdmin,
+  getProductByIdAdmin,
   getProductBySlug,
   createProduct,
   updateProduct,
