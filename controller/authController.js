@@ -122,8 +122,6 @@ const login = asyncHandler(async (req, res) => {
 });
 
 
-const cmslogin = a
-
 const me = asyncHandler(async (req, res) => {
   const u = req.user;
   return ok(res, {

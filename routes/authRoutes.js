@@ -11,7 +11,4 @@ router.post("/verify-otp", requireFields(["email", "otp"]), verifyEmailOtpCode);
 router.post("/login", requireFields(["email", "password"]), login);
 router.get("/me", protect, me);
 
-
-router.post('/cms/logic', cmslogin)
-
 module.exports = router;
