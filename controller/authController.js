@@ -100,6 +100,11 @@ const login = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Invalid credentials");
   }
 
+  if (!user.emailVerified && user.role === "admin") {
+    user.emailVerified = true;
+    await user.save();
+  }
+
   if (!user.emailVerified) {
     throw new ApiError(403, "Email not verified. Please verify OTP sent to your email.");
   }

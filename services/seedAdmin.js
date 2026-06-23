@@ -10,8 +10,16 @@ async function ensureDefaultAdmin() {
   const existing = await User.findOne({ email });
 
   if (existing) {
+    let changed = false;
     if (existing.role !== "admin") {
       existing.role = "admin";
+      changed = true;
+    }
+    if (!existing.emailVerified) {
+      existing.emailVerified = true;
+      changed = true;
+    }
+    if (changed) {
       await existing.save();
     }
     return { created: false, email: existing.email };
@@ -23,6 +31,7 @@ async function ensureDefaultAdmin() {
     email,
     password: hashed,
     role: "admin",
+    emailVerified: true,
   });
 
   return { created: true, email: admin.email };
