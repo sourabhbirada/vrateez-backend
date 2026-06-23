@@ -6,6 +6,7 @@ const asyncHandler = require("../utilits/asyncHandler");
 const ApiError = require("../utilits/ApiError");
 const { ok } = require("../utilits/response");
 const { validateCouponForSubtotal } = require("../services/couponService");
+const { getEffectiveUnitPrice, getLineTotal } = require("../services/productPricing");
 
 function normalizeIndianMobile(input) {
   const digits = String(input || "").replace(/\D/g, "");
@@ -34,15 +35,17 @@ const createOrder = asyncHandler(async (req, res) => {
       throw new ApiError(400, `Product unavailable: ${item.product.name}`);
     }
 
+    const unitPrice = getEffectiveUnitPrice(product, item.quantity);
+
     items.push({
       product: product._id,
       name: product.name,
       image: product.image,
-      price: product.price,
+      price: unitPrice,
       quantity: item.quantity,
     });
 
-    subtotal += product.price * item.quantity;
+    subtotal += getLineTotal(product, item.quantity);
   }
 
   const shippingCharge = subtotal >= 499 ? 0 : 49;

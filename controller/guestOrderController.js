@@ -13,6 +13,7 @@ const {
   getAvailableProviders,
 } = require("../services/paymentService");
 const { validateCouponForSubtotal } = require("../services/couponService");
+const { getEffectiveUnitPrice, getLineTotal } = require("../services/productPricing");
 
 // Helper to validate MongoDB ObjectId
 const isValidObjectId = (id) => {
@@ -54,15 +55,17 @@ const createGuestOrder = asyncHandler(async (req, res) => {
       throw new ApiError(400, `Product unavailable: ${item.productId}`);
     }
 
+    const unitPrice = getEffectiveUnitPrice(product, item.quantity);
+
     orderItems.push({
       product: product._id,
       name: product.name,
       image: product.image,
-      price: product.price,
+      price: unitPrice,
       quantity: item.quantity,
     });
 
-    subtotal += product.price * item.quantity;
+    subtotal += getLineTotal(product, item.quantity);
   }
 
   const shippingCharge = subtotal >= 499 ? 0 : 49;

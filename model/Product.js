@@ -1,5 +1,14 @@
 const mongoose = require("mongoose");
 
+const packOptionSchema = new mongoose.Schema(
+  {
+    units: { type: Number, required: true, min: 1 },
+    label: { type: String, trim: true },
+    discountPercent: { type: Number, default: 0, min: 0, max: 100 },
+  },
+  { _id: false }
+);
+
 const productSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -23,6 +32,8 @@ const productSchema = new mongoose.Schema(
     nutritionHighlights: [{ type: String }],
     stock: { type: Number, default: 100 },
     isActive: { type: Boolean, default: true },
+    amazonUrl: { type: String, trim: true },
+    packOptions: { type: [packOptionSchema], default: [] },
   },
   { timestamps: true }
 );

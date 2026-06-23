@@ -3,6 +3,18 @@ const asyncHandler = require("../utilits/asyncHandler");
 const { ok } = require("../utilits/response");
 const ApiError = require("../utilits/ApiError");
 const { seedProducts } = require("../services/productSeedData");
+const { normalizePackOptions } = require("../services/productPricing");
+
+function prepareProductPayload(body = {}) {
+  const payload = { ...body };
+  if (payload.packOptions !== undefined) {
+    payload.packOptions = normalizePackOptions(payload.packOptions);
+  }
+  if (payload.amazonUrl !== undefined) {
+    payload.amazonUrl = String(payload.amazonUrl || "").trim();
+  }
+  return payload;
+}
 
 const getProducts = asyncHandler(async (req, res) => {
   const { category, q, page = 1, limit = 20 } = req.query;
@@ -121,12 +133,12 @@ const getProductByIdAdmin = asyncHandler(async (req, res) => {
 });
 
 const createProduct = asyncHandler(async (req, res) => {
-  const created = await Product.create(req.body);
+  const created = await Product.create(prepareProductPayload(req.body));
   return ok(res, { product: created }, "Product created", 201);
 });
 
 const updateProduct = asyncHandler(async (req, res) => {
-  const updated = await Product.findByIdAndUpdate(req.params.id, req.body, {
+  const updated = await Product.findByIdAndUpdate(req.params.id, prepareProductPayload(req.body), {
     new: true,
     runValidators: true,
   });
